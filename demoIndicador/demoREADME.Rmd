@@ -1,0 +1,258 @@
+---
+title: "README"
+output: html_document
+---
+### Getting and Cleaning Data Project 
+#### The instructions below explain all the steps implemented in the script run_analysis, used to generate the tidy data set from the raw data sets
+
+> Running the run_analysis.R script should execute all the steps described bellow smoothly, creating the tiny data set file.
+
+> This script runs with RStudio Version 0.98.1049
+
+
+**STEP 1** *Merges the training and the test sets to create one data set.*
+
+For  **test data sets** the raw files that we will be working with are:
+
+* subject_test.txt - containing the number that identify each one of 30 the subjects in the study
+* X_test.txt - the actual raw data, obtained from the sensor data
+* y_test.txt - containing the number used for each activity label as described bellow:
+    + 1 = "WALKING"
+    + 2 = "WALKING_UPSTAIRS"
+    + 3 = "WALKING_DOWNSTAIRS"
+    + 4 = "SITTING"
+    + 5 = "STANDING"
+    + 6 = "LAYING"
+
+In a similar way,
+for  **training data sets** the raw files that we will be working with are:
+
+* subject_train.txt - containing the number that identify each one of 30 subjects in the study
+* X_train.txt - the actual raw data, obtained from the sensor data
+* y_train.txt - containing the number used for each activity label as described above for the test data set.
+    
+> obs: the sensor data sets will not be used to create our tidy dataset, once both X_test.txt and X_train.txt data sets come from them.
+
+We will work first with the **test dataset** and then we will replicate the same steps to prepare the **train dataset**.
+
+> be sure to have a folder called *project* to contain the UCI HAR Dataset structure on your working directory
+
+The **test files** are located under the UCI HAR Dataset/test folder into the project directory. 
+```{r, eval=FALSE}
+df_subject_test <- read.table("./project/UCI HAR Dataset/test/subject_test.txt")
+df_X_test <- read.table("./project/UCI HAR Dataset/test/X_test.txt")
+df_labels_test <- read.table("./project/UCI HAR Dataset/test/y_test.txt")
+```
+The **train files** are located under the UCI HAR Dataset/train folder into the project directory.
+```{r, eval=FALSE}
+df_subject_train <- read.table("./project/UCI HAR Dataset/train/subject_train.txt")
+df_X_train <- read.table("./project/UCI HAR Dataset/train/X_train.txt")
+df_labels_train <- read.table("./project/UCI HAR Dataset/train/y_train.txt")
+```
+
+We will work the test data set first and repeat the steps for the train data set later.
+
+We have to merge in a single file the subject ID, activity label and the actual data, considering that all of them are in the proper order. 
+Before that, we will change the column names for the activity labels and subject datasets, because they are both named "V1" and this same name is used in the X-test dataset.
+
+```{r, eval=FALSE}
+colnames(df_labels_test)[1] <- "activity"
+colnames(df_subject_test)[1] <- "subject"
+```
+
+Now we can safely merge the 3 datasets...
+```{r, eval=FALSE}
+df_l_s_X_test <- cbind(df_subject_test,df_labels_test,df_X_test)
+```
+The dataset df_l_s_X_test now contains all the test data associated with the subject and activity.
+
+Now we repeat the steps above to create the **train dataset**
+
+Changing the column names...
+```{r, eval=FALSE}
+colnames(df_labels_train)[1] <- "activity"
+colnames(df_subject_train)[1] <- "subject"
+```
+Merging the train datasets...
+```{r, eval=FALSE}
+df_l_s_X_train <- cbind(df_subject_train,df_labels_train,df_X_train)
+```
+Now we concatenate verticaly both the **test dataset** and the **train dataset**, for they have the same columns
+```{r, eval=FALSE}
+df_total <- rbind (df_l_s_X_test,df_l_s_X_train)
+```
+
+**STEP 2** *Extracts only the measurements on the mean and standard deviation for each measurement.*
+
+We know that the first column in the df_mean_std dataset is named "subject" , the second is named "activity" and the remaining, with the actual measurement data, goes from "V1" to "V561".
+Using the information in the file features.txt, we will select only the variables that are associated with the mean and standard deviation.
+
+Our criteria was to select all the variables that ended with the "mean" or "stdved" sufix.
+
+To extract only the mean and standard deviation for each measurement we will use the dplyr package...
+```{r, eval=FALSE}
+library(dplyr)
+df_mean_std <- select(df_total,subject,activity,V1:V6, V41:V46,V81:V86,V121:V126,V161:V166,V201:V202,
+                      V214:V215,V227:V228,V240:V241,V253:V254,V266:V271,V345:V350,
+                      V424:V429,V503:V504,V516:V517,V529:V530,V542:V543)
+```
+Now we have only the measurements needed in the dataset df_mean_std.
+
+**STEP 3** *Uses descriptive activity names to name the activities in the data set*
+
+**IMPORTANT:** We are now cleaning the not longer needed datasets before proceed. This is needed to free memory when dealing with big datasets. Otherwise you can have strange problems occurring in R Studio...
+```{r, eval=FALSE}
+rm(df_l_s_X_test,df_l_s_X_train,df_X_test, df_X_train, df_total)
+```
+
+
+We then change the numeric values of the activities to their associated labels...
+```{r, eval=FALSE}
+df_mean_std$activity <- as.character(df_mean_std$activity) # transforming activity from integer type to character type
+df_mean_std$activity[df_mean_std$activity == 1] <- "WALKING"
+df_mean_std$activity[df_mean_std$activity == 2] <- "WALKING_UPSTAIRS"
+df_mean_std$activity[df_mean_std$activity == 3] <- "WALKING_DOWNSTAIRS"
+df_mean_std$activity[df_mean_std$activity == 4] <- "SITTING"
+df_mean_std$activity[df_mean_std$activity == 5] <- "STANDING"
+df_mean_std$activity[df_mean_std$activity == 6] <- "LAYING"
+```
+
+**STEP 4** *From the data set in step 3, creates a second, independent tidy data set with the average of each variable for each activity and each subject.*
+
+In this step, we will group the data for activity and subject, obtaining the mean by using dplyer package again and write the tidy file.
+
+```{r, eval=FALSE}
+df_grouped <- group_by(df_mean_std, activity, subject)
+df_tidy <- summarise(df_grouped,mean(V1), mean(V2),mean(V3), mean(V4),mean(V5), mean(V6),
+                 mean(V41), mean(V42),mean(V43), mean(V44),mean(V45), mean(V46),
+                 mean(V81), mean(V82),mean(V83), mean(V84),mean(V85), mean(V86),
+                 mean(V121), mean(V122),mean(V123), mean(V124),mean(V125), mean(V126),
+                 mean(V161), mean(V162),mean(V163), mean(V164),mean(V165), mean(V166),
+                 mean(V201), mean(V202),
+                 mean(V214), mean(V215),
+                 mean(V227), mean(V228),
+                 mean(V240), mean(V241),
+                 mean(V253), mean(V254),
+                 mean(V266), mean(V267),mean(V268), mean(V269),mean(V270), mean(V271),
+                 mean(V345), mean(V346),mean(V347), mean(V348),mean(V349), mean(V350),
+                 mean(V424), mean(V425),mean(V426), mean(V427),mean(V428), mean(V429),
+                 mean(V503), mean(V504),
+                 mean(V516), mean(V517),
+                 mean(V529), mean(V530),
+                 mean(V542), mean(V543)
+                 )
+```
+
+**STEP 4** *Appropriately labels the data set with descriptive variable names.* 
+
+Now, in this final step, using again the features.txt file as a guide, we will change the current column names, to more descriptive names.
+
+I am pretty sure that with more available time I should come up with a loop or some package to do this easier,
+but, anyway, the first version is intended to get the job done, right?
+
+```{r, eval=FALSE}
+# creating descriptive names for variables in the range V1:V6
+names(df_mean_std)[names(df_mean_std) == 'V1'] <- "BodyAcceleration_MeanTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V2'] <- "BodyAcceleration_MeanTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V3'] <- "BodyAcceleration_MeanTimeDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V4'] <- "BodyAcceleration_StddevTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V5'] <- "BodyAcceleration_StddevTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V6'] <- "BodyAcceleration_StddevTimeDirZ"
+# creating descriptive names for variables in the range V41:V46
+names(df_mean_std)[names(df_mean_std) == 'V41'] <- "GravityAcceleration_MeanTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V42'] <- "GravityAcceleration_MeanTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V43'] <- "GravityAcceleration_MeanTimeDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V44'] <- "GravityAcceleration_StddevTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V45'] <- "GravityAcceleration_StddevTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V46'] <- "GravityAcceleration_StddevTimeDirZ"
+# creating descriptive names for variables in the range V81:V86
+names(df_mean_std)[names(df_mean_std) == 'V81'] <- "BodyAccelerationJerk_MeanTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V82'] <- "BodyAccelerationJerk_MeanTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V83'] <- "BodyAccelerationJerk_MeanTimeDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V84'] <- "BodyAccelerationJerk_StddevTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V85'] <- "BodyAccelerationJerk_StddevTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V86'] <- "BodyAccelerationJerk_StddevTimeDirZ"
+# creating descriptive names for variables in the range V121:V126
+names(df_mean_std)[names(df_mean_std) == 'V121'] <- "BodyGyroscopic_MeanTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V122'] <- "BodyGyroscopic_MeanTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V123'] <- "BodyGyroscopic_MeanTimeDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V124'] <- "BodyGyroscopic_StddevTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V125'] <- "BodyGyroscopic_StddevTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V126'] <- "BodyGyroscopic_StddevTimeDirZ"
+# creating descriptive names for variables in the range V161:V166
+names(df_mean_std)[names(df_mean_std) == 'V161'] <- "BodyGyroscopicJerk_MeanTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V162'] <- "BodyGyroscopicJerk_MeanTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V163'] <- "BodyGyroscopicJerk_MeanTimeDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V164'] <- "BodyGyroscopicJerk_StddevTimeDirX"
+names(df_mean_std)[names(df_mean_std) == 'V165'] <- "BodyGyroscopicJerk_StddevTimeDirY"
+names(df_mean_std)[names(df_mean_std) == 'V166'] <- "BodyGyroscopicJerk_StddevTimeDirZ"
+# creating descriptive names for variables in the range V201:V202
+names(df_mean_std)[names(df_mean_std) == 'V201'] <- "BodyAcceleration_MeanTimeMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V202'] <- "BodyAcceleration_StddevTimeMagnitude"
+# creating descriptive names for variables in the range V214:V215
+names(df_mean_std)[names(df_mean_std) == 'V214'] <- "GravityAcceleration_MeanTimeMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V215'] <- "GravityAcceleration_StddevTimeMagnitude"
+# creating descriptive names for variables in the range V227:V228
+names(df_mean_std)[names(df_mean_std) == 'V227'] <- "BodyAccelerationJerk_MeanTimeMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V228'] <- "BodyAccelerationJerk_StddevTimeMagnitude"
+# creating descriptive names for variables in the range V240:V241
+names(df_mean_std)[names(df_mean_std) == 'V240'] <- "BodyGyroscopic_MeanTimeMagnitudee"
+names(df_mean_std)[names(df_mean_std) == 'V241'] <- "BodyGyroscopic_StddevTimeMagnitude"
+# creating descriptive names for variables in the range V253:V254
+names(df_mean_std)[names(df_mean_std) == 'V253'] <- "BodyGyroscopicJerk_MeanTimeMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V254'] <- "BodyGyroscopicJerk_StddevTimeMagnitude"
+# creating descriptive names for variables in the range V266:V271
+names(df_mean_std)[names(df_mean_std) == 'V266'] <- "BodyAcceleration_MeanFfourierDirX"
+names(df_mean_std)[names(df_mean_std) == 'V267'] <- "BodyAcceleration_MeanFfourierDirY"
+names(df_mean_std)[names(df_mean_std) == 'V268'] <- "BodyAcceleration_MeanFfourierDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V269'] <- "BodyAcceleration_StddevFfourierDirX"
+names(df_mean_std)[names(df_mean_std) == 'V270'] <- "BodyAcceleration_StddevFfourierDirY"
+names(df_mean_std)[names(df_mean_std) == 'V271'] <- "BodyAcceleration_StddevFfourierDirZ"
+# creating descriptive names for variables in the range V345:V350
+names(df_mean_std)[names(df_mean_std) == 'V345'] <- "BodyAccelerationJerk_MeanFfourierDirX"
+names(df_mean_std)[names(df_mean_std) == 'V346'] <- "BodyAccelerationJerk_MeanFfourierDirY"
+names(df_mean_std)[names(df_mean_std) == 'V347'] <- "BodyAccelerationJerk_MeanFfourierDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V348'] <- "BodyAccelerationJerk_StddevFfourierDirX"
+names(df_mean_std)[names(df_mean_std) == 'V349'] <- "BodyAccelerationJerk_StddevFfourierDirY"
+names(df_mean_std)[names(df_mean_std) == 'V350'] <- "BodyAccelerationJerk_StddevFfourierDirZ"
+# creating descriptive names for variables in the range V424:V429
+names(df_mean_std)[names(df_mean_std) == 'V424'] <- "BodyGyroscopic_MeanFfourierDirX"
+names(df_mean_std)[names(df_mean_std) == 'V425'] <- "BodyGyroscopic_MeanFfourierDirY"
+names(df_mean_std)[names(df_mean_std) == 'V426'] <- "BodyGyroscopic_MeanFfourierDirZ"
+names(df_mean_std)[names(df_mean_std) == 'V427'] <- "BodyGyroscopic_StddevFfourierDirX"
+names(df_mean_std)[names(df_mean_std) == 'V428'] <- "BodyGyroscopic_StddevFfourierDirY"
+names(df_mean_std)[names(df_mean_std) == 'V429'] <- "BodyGyroscopic_StddevFfourierDirZ"
+# creating descriptive names for variables in the range V503:V504
+names(df_mean_std)[names(df_mean_std) == 'V503'] <- "BodyAcceleration_MeanFfourierMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V504'] <- "BodyAcceleration_StddevFfourierMagnitude"
+# creating descriptive names for variables in the range V516:V517
+names(df_mean_std)[names(df_mean_std) == 'V516'] <- "BodyAccelerationJerk_MeanFfourierMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V517'] <- "BodyAccelerationJerk_StddevFfourierMagnitude"
+# creating descriptive names for variables in the range V529:V530
+names(df_mean_std)[names(df_mean_std) == 'V529'] <- "BodyGyroscopic_MeanFfourierMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V530'] <- "BodyGyroscopic_StddevFfourierMagnitude"
+# creating descriptive names for variables in the range V542:V543
+names(df_mean_std)[names(df_mean_std) == 'V542'] <- "BodyGyroscopicJerk_MeanFfourierMagnitude"
+names(df_mean_std)[names(df_mean_std) == 'V543'] <- "BodyGyroscopicJerk_StddevFfourierMagnitude"
+```
+
+Finaly we can save our data set to a text file...
+```{r, eval=FALSE}
+write.table(df_tidy, file = "./data/tidy_project.txt",sep = ",",row.name = FALSE)
+```
+
+> the file can be easily read if imported into an Excel spreadsheet.
+
+If you want to check the if the values generated are correct, try the code below (that I keep commented in the script file),
+selecting some random values and comparing them with the values into the tidy_project.txt file.
+If you import the file into a Excel spreadsheet it will be more confortable to work.
+```{r, eval=FALSE}
+# uncomment the code below to test the final file generated. 
+# remember that the variable names are not changed in this dataset (V1, V2, etc).
+# but as it is in the same order, it is easy to select some values and check against the data file.
+# you can import the text file to Excel to make the things easier
+x <- df_mean_std$V2[df_mean_std$activity == "WALKING" & df_mean_std$subject == 14]
+mean(x)
+```
+Thanks!!
+
